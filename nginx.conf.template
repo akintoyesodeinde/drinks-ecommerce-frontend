@@ -1,0 +1,97 @@
+server {
+    listen 80;
+    server_name _;
+
+    root /usr/share/nginx/html;
+    index index.html;
+
+    # Docker embedded DNS resolver so container IP changes on api rolling updates are picked up automatically
+    resolver 127.0.0.11 valid=10s ipv6=off;
+
+    # Security headers
+    add_header X-Frame-Options "SAMEORIGIN" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+    add_header X-XSS-Protection "1; mode=block" always;
+
+    # Gzip compression
+    gzip on;
+    gzip_vary on;
+    gzip_min_length 1024;
+    gzip_proxied any;
+    gzip_types
+        text/plain
+        text/css
+        text/javascript
+        application/javascript
+        application/json
+        application/xml
+        image/svg+xml;
+
+    # Frontend container liveness endpoint
+    location = /healthz {
+        access_log off;
+        default_type text/plain;
+        return 200 "healthy\n";
+    }
+
+    # Proxy backend API and static asset routes to upstream API container
+    location /api/ {
+        set $upstream_api ${API_UPSTREAM};
+        proxy_pass $upstream_api;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        client_max_body_size 5M;
+    }
+
+    location /images/ {
+        set $upstream_api ${API_UPSTREAM};
+        proxy_pass $upstream_api;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        expires 7d;
+        add_header Cache-Control "public, max-age=604800";
+    }
+
+    location /uploads/ {
+        set $upstream_api ${API_UPSTREAM};
+        proxy_pass $upstream_api;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        expires 7d;
+        add_header Cache-Control "public, max-age=604800";
+    }
+
+    location /dev/ {
+        set $upstream_api ${API_UPSTREAM};
+        proxy_pass $upstream_api;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    location /health/ {
+        set $upstream_api ${API_UPSTREAM};
+        proxy_pass $upstream_api;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+    }
+
+    # Cache hashed static frontend assets aggressively
+    location /assets/ {
+        expires 1y;
+        add_header Cache-Control "public, max-age=31536000, immutable";
+        try_files $uri =404;
+    }
+
+    # SPA fallback
+    location / {
+        add_header Cache-Control "no-cache";
+        try_files $uri $uri/ /index.html;
+    }
+}
