@@ -14,7 +14,7 @@ permissions:
 env:
   NODE_VERSION: "22"
   DOCKERHUB_REPO: "akintoyesodeinde/drinks-ecommerce-frontend"
-  DEFAULT_AWS_REGION: "us-east-1"
+  DEFAULT_AWS_REGION: "eu-north-1"
   DEFAULT_AWS_ROLE_ARN: "arn:aws:iam::415805875879:role/DrinksEcommerce-GitHubActions-Deploy"
 
 jobs:
