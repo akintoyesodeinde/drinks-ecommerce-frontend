@@ -16,29 +16,105 @@ const loginSchema = z.object({
 });
 type LoginFormValues = z.infer<typeof loginSchema>;
 
+interface DemoAccountPreset {
+  roleLabel: string;
+  badgeClass: string;
+  email: string;
+  password: string;
+  defaultRedirect: string;
+  description: string;
+}
+
+const DEMO_ACCOUNTS: DemoAccountPreset[] = [
+  {
+    roleLabel: 'SuperAdmin',
+    badgeClass: 'text-bg-danger',
+    email: 'admin@drinksecommerce.ng',
+    password: 'Admin@12345!',
+    defaultRedirect: '/admin',
+    description: 'Executive Analytics, Catalog, Inventory, Orders, Payments, Refunds & Audit Logs',
+  },
+  {
+    roleLabel: 'Warehouse / Operations',
+    badgeClass: 'text-bg-primary',
+    email: 'warehouse@drinksecommerce.ng',
+    password: 'Staff@12345!',
+    defaultRedirect: '/admin/orders',
+    description: 'Order Preparation, Stock Adjustments & Warehouse Fulfilment Queue',
+  },
+  {
+    roleLabel: 'Delivery Rider',
+    badgeClass: 'text-bg-warning',
+    email: 'rider@drinksecommerce.ng',
+    password: 'Rider@12345!',
+    defaultRedirect: '/admin/deliveries',
+    description: 'Assigned Dispatch Manifests, Out-for-Delivery & Proof of Delivery',
+  },
+  {
+    roleLabel: 'Customer',
+    badgeClass: 'text-bg-success',
+    email: 'customer@drinksecommerce.ng',
+    password: 'Customer@12345!',
+    defaultRedirect: '/',
+    description: 'Storefront Shopping, Cart, WELCOME10 Coupon, Paystack Checkout & Order Tracking',
+  },
+];
+
 export const LoginPage: React.FC = () => {
   const { login } = useAuth();
   const { showToast } = useToast();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [serverError, setServerError] = useState<string | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
 
-  const returnUrl = searchParams.get('returnUrl') || '/';
+  const explicitReturnUrl = searchParams.get('returnUrl');
+  const returnUrl = explicitReturnUrl || '/';
 
   const {
     register,
     handleSubmit,
+    setValue,
     formState: { errors, isSubmitting },
   } = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
   });
+
+  const resolvePostLoginRedirect = (roles: string[]) => {
+    if (explicitReturnUrl) return explicitReturnUrl;
+    if (roles.includes('Administrator')) return '/admin';
+    if (roles.includes('WarehouseStaff')) return '/admin/orders';
+    if (roles.includes('DeliveryStaff')) return '/admin/deliveries';
+    return '/';
+  };
 
   const onSubmit = async (values: LoginFormValues) => {
     setServerError(null);
     try {
       const user = await login(values);
       showToast(`Welcome back, ${user.firstName}!`, 'success');
-      navigate(returnUrl, { replace: true });
+      navigate(resolvePostLoginRedirect(user.roles), { replace: true });
+    } catch (err) {
+      setServerError(err instanceof Error ? err.message : 'Invalid email or password');
+    }
+  };
+
+  const handleFillDemoAccount = (preset: DemoAccountPreset) => {
+    setServerError(null);
+    setValue('email', preset.email, { shouldValidate: true, shouldDirty: true });
+    setValue('password', preset.password, { shouldValidate: true, shouldDirty: true });
+    setShowPassword(true);
+    showToast(`Filled ${preset.roleLabel} credentials (${preset.email})`, 'info');
+  };
+
+  const handleInstantDemoLogin = async (preset: DemoAccountPreset) => {
+    setServerError(null);
+    setValue('email', preset.email, { shouldValidate: true, shouldDirty: true });
+    setValue('password', preset.password, { shouldValidate: true, shouldDirty: true });
+    try {
+      const user = await login({ email: preset.email, password: preset.password });
+      showToast(`Signed in as ${preset.roleLabel} (${user.firstName})!`, 'success');
+      navigate(explicitReturnUrl || preset.defaultRedirect, { replace: true });
     } catch (err) {
       setServerError(err instanceof Error ? err.message : 'Invalid email or password');
     }
@@ -46,59 +122,169 @@ export const LoginPage: React.FC = () => {
 
   return (
     <div className="container py-5">
-      <div className="card shadow-sm border-0 mx-auto" style={{ maxWidth: 440 }}>
-        <div className="card-body p-4">
-          <h1 className="h4 fw-bold mb-1 text-center">Sign In</h1>
-          <p className="text-muted small text-center mb-4">
-            Access your DrinksEcommerce account and orders
-          </p>
+      <div className="row g-4 justify-content-center align-items-start">
+        {/* Sign In Card */}
+        <div className="col-12 col-lg-5">
+          <div className="card shadow-sm border-0 mx-auto" style={{ maxWidth: 460 }}>
+            <div className="card-body p-4">
+              <h1 className="h4 fw-bold mb-1 text-center">Sign In</h1>
+              <p className="text-muted small text-center mb-4">
+                Access your DrinksEcommerce account and orders
+              </p>
 
-          {serverError && (
-            <div className="alert alert-danger py-2 small" role="alert">
-              {serverError}
+              {serverError && (
+                <div className="alert alert-danger py-2 small" role="alert">
+                  {serverError}
+                </div>
+              )}
+
+              <form onSubmit={handleSubmit(onSubmit)} noValidate>
+                <TextField
+                  label="Email Address"
+                  type="email"
+                  autoComplete="email"
+                  required
+                  error={errors.email?.message}
+                  {...register('email')}
+                />
+                <div className="position-relative">
+                  <TextField
+                    label="Password"
+                    type={showPassword ? 'text' : 'password'}
+                    autoComplete="current-password"
+                    required
+                    error={errors.password?.message}
+                    {...register('password')}
+                  />
+                  <button
+                    type="button"
+                    className="btn btn-sm btn-link text-secondary text-decoration-none position-absolute"
+                    style={{ top: 0, right: 0, padding: '0 4px', fontSize: '0.8rem' }}
+                    onClick={() => setShowPassword((prev) => !prev)}
+                  >
+                    {showPassword ? 'Hide Password' : 'Show Password'}
+                  </button>
+                </div>
+                <div className="d-flex justify-content-end mb-3">
+                  <Link to="/forgot-password" className="small text-decoration-none">
+                    Forgot password?
+                  </Link>
+                </div>
+                <button
+                  type="submit"
+                  className="btn btn-success w-100 fw-semibold"
+                  disabled={isSubmitting}
+                >
+                  {isSubmitting ? 'Signing in...' : 'Sign In'}
+                </button>
+              </form>
+
+              <hr className="my-4" />
+              <div className="text-center small">
+                Don&apos;t have an account?{' '}
+                <Link
+                  to={`/register?returnUrl=${encodeURIComponent(returnUrl)}`}
+                  className="fw-semibold text-success text-decoration-none"
+                >
+                  Create Account
+                </Link>
+              </div>
             </div>
-          )}
+          </div>
+        </div>
 
-          <form onSubmit={handleSubmit(onSubmit)} noValidate>
-            <TextField
-              label="Email Address"
-              type="email"
-              autoComplete="email"
-              required
-              error={errors.email?.message}
-              {...register('email')}
-            />
-            <TextField
-              label="Password"
-              type="password"
-              autoComplete="current-password"
-              required
-              error={errors.password?.message}
-              {...register('password')}
-            />
-            <div className="d-flex justify-content-end mb-3">
-              <Link to="/forgot-password" className="small text-decoration-none">
-                Forgot password?
-              </Link>
+        {/* AWS Sandbox & CTO Demo Presentation Credentials Card */}
+        <div className="col-12 col-lg-7">
+          <div className="card shadow-sm border-0" data-testid="demo-accounts-panel">
+            <div className="card-header bg-dark text-white d-flex flex-wrap justify-content-between align-items-center gap-2 py-3">
+              <div>
+                <h2 className="h6 fw-bold mb-0">
+                  <i className="bi bi-key-fill text-warning me-2" aria-hidden="true" />
+                  AWS Sandbox — Seeded Demo Accounts &amp; Credentials
+                </h2>
+                <div className="small text-white-50 mt-1">
+                  Automatically seeded by <code>DatabaseSeeder.cs</code> for CTO &amp; Executive Demo Presentation
+                </div>
+              </div>
+              <span className="badge text-bg-success">AWS Sandbox Ready</span>
             </div>
-            <button
-              type="submit"
-              className="btn btn-success w-100 fw-semibold"
-              disabled={isSubmitting}
-            >
-              {isSubmitting ? 'Signing in...' : 'Sign In'}
-            </button>
-          </form>
 
-          <hr className="my-4" />
-          <div className="text-center small">
-            Don&apos;t have an account?{' '}
-            <Link
-              to={`/register?returnUrl=${encodeURIComponent(returnUrl)}`}
-              className="fw-semibold text-success text-decoration-none"
-            >
-              Create Account
-            </Link>
+            <div className="card-body p-3 p-md-4">
+              <div className="table-responsive">
+                <table className="table table-hover align-middle mb-3">
+                  <thead className="table-light small text-uppercase">
+                    <tr>
+                      <th>Role</th>
+                      <th>Email Address</th>
+                      <th>Password</th>
+                      <th className="text-end">Quick Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {DEMO_ACCOUNTS.map((acct) => (
+                      <tr key={acct.email}>
+                        <td>
+                          <span className={`badge ${acct.badgeClass} d-inline-block mb-1`}>
+                            {acct.roleLabel}
+                          </span>
+                          <div className="text-muted" style={{ fontSize: '0.75rem' }}>
+                            {acct.description}
+                          </div>
+                        </td>
+                        <td>
+                          <code className="text-dark fw-semibold user-select-all">
+                            {acct.email}
+                          </code>
+                        </td>
+                        <td>
+                          <code className="text-success fw-bold user-select-all">
+                            {acct.password}
+                          </code>
+                        </td>
+                        <td className="text-end">
+                          <div className="d-flex justify-content-end gap-1 flex-wrap">
+                            <button
+                              type="button"
+                              className="btn btn-outline-secondary btn-sm"
+                              disabled={isSubmitting}
+                              onClick={() => handleFillDemoAccount(acct)}
+                            >
+                              Fill
+                            </button>
+                            <button
+                              type="button"
+                              className="btn btn-success btn-sm fw-semibold"
+                              disabled={isSubmitting}
+                              onClick={() => void handleInstantDemoLogin(acct)}
+                            >
+                              Sign In
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="bg-light rounded p-3 small border">
+                <div className="fw-bold text-dark mb-2">
+                  <i className="bi bi-database-check text-success me-1" aria-hidden="true" />
+                  Seeded Development Data &amp; Sandbox Configuration
+                </div>
+                <ul className="mb-0 ps-3 text-secondary d-flex flex-column gap-1">
+                  <li>
+                    <strong>Catalog:</strong> 7 Categories (<em>Soft Drinks, Water, Fruit Juices, Malt &amp; Non-Alcoholic, Energy Drinks, Mixers &amp; Syrups, Bundles &amp; Party Packs</em>) + 1 Alcohol policy-gated category (<em>Alcoholic Beverages</em>), 11 Nigerian products with 21 pack variants (<em>Single, Multipack, Carton, Crate, Sachet, Bundle</em>), inventory levels, and SVG product artwork.
+                  </li>
+                  <li>
+                    <strong>Delivery Zones &amp; Pickup Hubs:</strong> Lagos Island Express (₦1,500, free above ₦50,000), Lagos Mainland Standard (₦2,000, free above ₦50,000), Abuja Metro (₦3,500), Port Harcourt &amp; South-South (₦4,000), South-West Regional (₦2,800), Nationwide Standard (₦5,500), plus Victoria Island and Ikeja pickup hubs.
+                  </li>
+                  <li>
+                    <strong>Active Coupon:</strong> <code>WELCOME10</code> (10% off orders ≥ ₦5,000, capped at ₦3,000).
+                  </li>
+                </ul>
+              </div>
+            </div>
           </div>
         </div>
       </div>
