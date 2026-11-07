@@ -4,7 +4,7 @@ Production-oriented **React 19 + TypeScript + Vite + Bootstrap 5** web applicati
 
 - **Frontend Repository**: `https://github.com/akintoyesodeinde/drinks-ecommerce-frontend`
 - **Backend API Repository**: `https://github.com/akintoyesodeinde/drinks-ecommerce-backend`
-- **Docker Hub Image**: `akintoyesodeinde/drinks-ecommerce-frontend:<commit-sha>`
+
 
 ---
 
@@ -56,5 +56,5 @@ At runtime, the Nginx container listens on port `80`, serves `/healthz` (`200 he
 Defined in [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml):
 1. Runs `npm ci`, `npm run lint`, `npm test` (Vitest), and `npm run build`.
 2. Builds and pushes `akintoyesodeinde/drinks-ecommerce-frontend:<commit-sha>` and `:latest` to Docker Hub using `DOCKERHUB_USERNAME` and `DOCKERHUB_TOKEN`.
-3. Authenticates to AWS Account `402535053369` (`us-east-1`) via **GitHub OIDC** (`aws-actions/configure-aws-credentials@v4` with `id-token: write` — **zero static AWS credentials stored in GitHub**).
+3. Authenticates to an AWS Account.
 4. Triggers an AWS Systems Manager (`SSM SendCommand`) rolling update of the `frontend` container on EC2, verifies `/healthz` and `/`, and automatically rolls back to the previous image SHA if health checks fail.
